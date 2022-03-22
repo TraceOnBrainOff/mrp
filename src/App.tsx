@@ -90,7 +90,6 @@ const App = () => {
                           setGHP((ghp) => {
                             const tempGHP = ghp;
                             tempGHP[index1][index2] = value;
-
                             setX(
                               getX(ghp, MRPPlanowanePrzyjecia, mrpVariables)
                             );
@@ -206,6 +205,7 @@ const App = () => {
         />
       </ScrollArea>
     </AppShell>
+
   );
 };
 
