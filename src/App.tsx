@@ -1,99 +1,211 @@
-import React from "react";
+import React, { useEffect } from "react";
+
 import {
   AppShell,
   Header,
-  MantineProvider,
-  Navbar,
-  NumberInput,
   ScrollArea,
-  Table,
   Title,
   Text,
-  MediaQuery,
-  Burger,
-  useMantineTheme,
+  Table,
+  NumberInput,
+  Space,
 } from "@mantine/core";
 
-import { MyTable } from "./Table/Table"
-
-const elements = [
-  { name: "Przewidywany popyt" },
-  { name: "Produkcja" },
-  { name: "Dostępne" },
-  { name: "Czas realizacji = Na stanie = " },
-];
-
-const elements2 = [
-  { name: "Całkowite zapotrzebowanie" },
-  { name: "Planowane przyjęcia" },
-  { name: "Przewidywane na stanie" },
-  { name: "Zapotrzebowanie netto" },
-  { name: "Planowane zamówienia" },
-  { name: "Planowane przyjęcie zamówień" },
-  { name: "Czas realizacji = Wielkość partii = Poziom BOM = Na stanie = " }
-];
+import { getX, getY, Ghp, Mrp, transpose } from "./utils";
 
 const App = () => {
-  const [opened, setOpened] = React.useState(false);
-  const theme = useMantineTheme();
+  const [MRPPlanowanePrzyjecia, setMRPPlanowanePrzyjecia] = React.useState<
+    number[]
+  >([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+
+  const [ghpVariables, setGhpVariables] = React.useState({
+    czasRealizacji: 1,
+    naStanie: 2,
+  });
+
+  const [mrpVariables, setMrpVariables] = React.useState({
+    czasRealizacji: 2,
+    naStanie: 22,
+    poziomBOM: 1,
+    wielkoscPartii: 40,
+  });
+
+  const [GHP, setGHP] = React.useState<number[][]>(() => {
+    const emptyArr = Array.from(Array(3), () => new Array(10).fill(undefined));
+    emptyArr[Ghp.PRZEWIDYWANY_POPTY][4] = 20;
+    emptyArr[Ghp.PRZEWIDYWANY_POPTY][6] = 40;
+    emptyArr[Ghp.PRODUKCJA][4] = 28;
+    emptyArr[Ghp.PRODUKCJA][6] = 30;
+    return getY(emptyArr, ghpVariables);
+  });
+
+  const [x, setX] = React.useState<number[][]>(() =>
+    getX(GHP, MRPPlanowanePrzyjecia, mrpVariables)
+  );
+
+  useEffect(
+    () => setX(getX(GHP, MRPPlanowanePrzyjecia, mrpVariables)),
+    [mrpVariables]
+  );
+  useEffect(() => setGHP(getY(GHP, ghpVariables)), [ghpVariables]);
 
   return (
-    <MantineProvider
-      withGlobalStyles
-      withNormalizeCSS
-      theme={{ colorScheme: "dark" }}
-    >
-      <AppShell
-        navbarOffsetBreakpoint="sm"
-        padding={0}
-        fixed
-        styles={(theme) => ({
-          main: {
-            backgroundColor:
-              theme.colorScheme === "dark"
-                ? theme.colors.dark[8]
-                : theme.colors.gray[0],
-            height: `100vh`,
-          },
-        })}
-        navbar={
-          <Navbar
-            p="md"
-            hiddenBreakpoint="sm"
-            hidden={!opened}
-            width={{ sm: 300, lg: 400 }}
+    <AppShell
+      padding={0}
+      fixed
+      styles={(theme) => ({
+        main: {
+          backgroundColor:
+            theme.colorScheme === "dark"
+              ? theme.colors.dark[8]
+              : theme.colors.gray[0],
+          height: `100vh`,
+        },
+      })}
+      header={
+        <Header height={70} p="md">
+          <div
+            style={{ display: "flex", alignItems: "center", height: "100%" }}
           >
-            <Text>Application navbar</Text>
-          </Navbar>
-        }
-        header={
-          <Header height={70} p="md">
-            <div
-              style={{ display: "flex", alignItems: "center", height: "100%" }}
-            >
-              <MediaQuery largerThan="sm" styles={{ display: "none" }}>
-                <Burger
-                  opened={opened}
-                  onClick={() => setOpened((o) => !o)}
-                  size="sm"
-                  color={theme.colors.gray[6]}
-                  mr="xl"
-                />
-              </MediaQuery>
+            <Text>Algorytm MRP dla produkcji łóżek</Text>
+          </div>
+        </Header>
+      }
+    >
+      <ScrollArea p="md" style={{ height: "100%" }}>
+        <Title order={1}>GHP</Title>
+        <Table my="md">
+          <tbody>
+            {GHP.map((row, index1) => (
+              <tr key={index1}>
+                {row.map((col, index2) =>
+                  index1 === Ghp.DOSTEPNE ? (
+                    <td style={{ height: 50.5, textAlign: "center" }}>{col}</td>
+                  ) : (
+                    <td>
+                      <NumberInput
+                        value={col || undefined}
+                        hideControls
+                        onChange={(value: number) => {
+                          setGHP((ghp) => {
+                            const tempGHP = ghp;
+                            tempGHP[index1][index2] = value;
+                            setX(
+                              getX(ghp, MRPPlanowanePrzyjecia, mrpVariables)
+                            );
+                            return getY(tempGHP, ghpVariables);
+                          });
+                        }}
+                      />
+                    </td>
+                  )
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+        <NumberInput
+          label="Czas realizacji"
+          min={0}
+          value={ghpVariables.czasRealizacji}
+          onChange={(value: number) => {
+            setGhpVariables((ghpVariables) => ({
+              ...ghpVariables,
+              czasRealizacji: value || 0,
+            }));
+          }}
+        />
+        <NumberInput
+          label="Na stanie"
+          min={0}
+          value={ghpVariables.naStanie}
+          onChange={(value: number) => {
+            setGhpVariables((ghpVariables) => ({
+              ...ghpVariables,
+              naStanie: value || 0,
+            }));
+          }}
+        />
+        <Space h="xl" />
+        <Title order={1}>MRP</Title>
+        <Table my="md">
+          <tbody>
+            {transpose(x.slice(ghpVariables.czasRealizacji))?.map(
+              (row, index1) => (
+                <tr key={index1}>
+                  {row.map((col, index2) =>
+                    index1 !== Mrp.PLANOWANE_PRZYJECIA ? (
+                      <td style={{ height: 50.5, textAlign: "center" }}>
+                        {col}
+                      </td>
+                    ) : (
+                      <td>
+                        <NumberInput
+                          value={
+                            MRPPlanowanePrzyjecia[
+                              index2 + ghpVariables.czasRealizacji
+                            ] || undefined
+                          }
+                          hideControls
+                          onChange={(value: number) => {
+                            setMRPPlanowanePrzyjecia(
+                              (mrpPlanowanePrzyjecia) => {
+                                const tempGHP = mrpPlanowanePrzyjecia;
+                                tempGHP[index2 + ghpVariables.czasRealizacji] =
+                                  value;
 
-              <Text>Application header</Text>
-            </div>
-          </Header>
-        }
-      >
-        <ScrollArea p="md" style={{ height: "100%" }}>
-          <Title order={1}>GHP</Title>
-          <MyTable my="md" headers={[1,2,3,4,5,6,7,8,9,10]} headerTitle={"Tydzień:"} elements={elements}></MyTable>
-          <Title order={1}>MRP</Title>
-          <MyTable my="md" headers={[1,2,3,4,5,6]} headerTitle={"Dane produkcyjne: Okres:"} elements={elements2}></MyTable>
-        </ScrollArea>
-      </AppShell>
-    </MantineProvider>
+                                setX(
+                                  getX(GHP, MRPPlanowanePrzyjecia, mrpVariables)
+                                );
+                                return tempGHP;
+                              }
+                            );
+                          }}
+                        />
+                      </td>
+                    )
+                  )}
+                </tr>
+              )
+            )}
+          </tbody>
+        </Table>
+        <NumberInput
+          label="Czas realizacji"
+          min={0}
+          value={mrpVariables.czasRealizacji}
+          onChange={(value: number) => {
+            setMrpVariables((mrpVariables) => ({
+              ...mrpVariables,
+              czasRealizacji: value || 0,
+            }));
+          }}
+        />
+        <NumberInput
+          label="Na stanie"
+          min={0}
+          value={mrpVariables.naStanie}
+          onChange={(value: number) => {
+            setMrpVariables((mrpVariables) => ({
+              ...mrpVariables,
+              naStanie: value || 0,
+            }));
+          }}
+        />
+        <NumberInput
+          label="Wielkosc Partii"
+          min={0}
+          value={mrpVariables.wielkoscPartii}
+          onChange={(value: number) => {
+            setMrpVariables((mrpVariables) => ({
+              ...mrpVariables,
+              wielkoscPartii: value || 0,
+            }));
+          }}
+        />
+      </ScrollArea>
+    </AppShell>
+
   );
 };
 
